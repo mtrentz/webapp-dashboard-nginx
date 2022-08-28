@@ -1,4 +1,5 @@
 from flask import Flask, render_template, request, redirect, session
+from requests import get
 
 app = Flask(__name__)
 app.secret_key = "very-secret"
@@ -28,6 +29,8 @@ def auth():
         return redirect("/")
     else:
         return redirect("/login")
+
+
 
 
 app.run(debug=False, host="0.0.0.0")
