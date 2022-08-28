@@ -4,6 +4,9 @@ import requests
 
 app = Flask(__name__)
 app.secret_key = "very-secret"
+app.config.update(
+    SESSION_COOKIE_SAMESITE=None,
+)
 
 username = "admin"
 password = "admin"
@@ -42,31 +45,45 @@ app.url_map.converters['regex'] = RegexConverter
 
 # Regex converter to route a path that
 # starts with /_dash
-@app.route("/_dash<regex('.*'):dash_path>")
-@app.route("/_dash<regex('.*'):dash_path>/<path:path>")
+@app.route("/_dash<regex('.*'):dash_path>", methods=["GET", "POST"])
+@app.route("/_dash<regex('.*'):dash_path>/<path:path>", methods=["GET", "POST"])
 def dash_proxy(*args, **kwargs):
-    return "OK\n"
+    if "user" not in session:
+        # Return a msg with error
+        return Response("Unauthorized", status=401)
+
+    resp = requests.request(
+        method=request.method,
+        url=request.url.replace(request.host_url, 'http://dash-dashboard:8050/'),
+        headers={key: value for (key, value) in request.headers if key != 'Host'},
+        data=request.get_data(),
+        cookies=request.cookies,
+        allow_redirects=False)
+
+    excluded_headers = ['content-encoding', 'content-length', 'transfer-encoding', 'connection']
+    headers = [(name, value) for (name, value) in resp.raw.headers.items()
+               if name.lower() not in excluded_headers]
+
+    response = Response(resp.content, resp.status_code, headers)
+    return response
 
 
 #  Match any route like /proxy/foo/bar or just /proxy
-@app.route("/proxy")
-@app.route("/proxy/<path:path>")
+@app.route("/proxy", methods=["GET", "POST"])
+@app.route("/proxy/<path:path>", methods=["GET", "POST"])
 def proxy(*args, **kwargs):
     """
     Remove o prefixo /proxy/ da URL e repassa a requisição para o servidor de destino.
     """
-    print("Request URL", request.url)
-    print("Host URL", request.host_url)
-    print("New URL", request.url.replace(request.host_url, "http://localhost:5000/"))
-    print("Clean URL", request.url.replace(f"{request.host_url}proxy", 'http://localhost:5000'))
-    # new_url = request.url.replace(f"{request.host_url}/proxy", 'http://localhost:5000/')
-    # print("New URL", new_url)
-    # print("yo")
+    if "user" not in session:
+        # Return a msg with error
+        return Response("Unauthorized", status=401)
+
     resp = requests.request(
         method=request.method,
         # Transforma, por exemplo: http://localhost:5005/proxy/foo/bar em http://localhost:5000/foo/bar
         # url=request.url.replace(f"{request.host_url}proxy", 'http://dash-dashboard:5000'),
-        url=request.url.replace(f"{request.host_url}proxy", 'http://localhost:5000'),
+        url=request.url.replace(f"{request.host_url}proxy", 'http://dash-dashboard:8050'),
         headers={key: value for (key, value) in request.headers if key != 'Host'},
         data=request.get_data(),
         cookies=request.cookies,
