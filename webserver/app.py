@@ -76,13 +76,11 @@ def proxy(*args, **kwargs):
     Remove o prefixo /proxy/ da URL e repassa a requisição para o servidor de destino.
     """
     if "user" not in session:
-        # Return a msg with error
+        # Return a msg with errorsim
         return Response("Unauthorized", status=401)
 
     resp = requests.request(
         method=request.method,
-        # Transforma, por exemplo: http://localhost:5005/proxy/foo/bar em http://localhost:5000/foo/bar
-        # url=request.url.replace(f"{request.host_url}proxy", 'http://dash-dashboard:5000'),
         url=request.url.replace(f"{request.host_url}proxy", 'http://dash-dashboard:8050'),
         headers={key: value for (key, value) in request.headers if key != 'Host'},
         data=request.get_data(),
